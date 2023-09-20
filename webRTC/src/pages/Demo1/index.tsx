@@ -16,6 +16,7 @@ export const Demo1 = () => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const bufRef = useRef<Blob[]>([]);
 	const videoReplayRef = useRef<HTMLVideoElement>(null);
+	const recorderRef = useRef<MediaRecorder | null>(null);
 
 	const [isCameraOpen, setIsCameraOpen] = useState(false);
 	const [filterValue, setFilterValue] = useState<string>('none');
@@ -23,11 +24,14 @@ export const Demo1 = () => {
 
 	const onToggleCamera = async () => {
 		const isOpen = !isCameraOpen;
+
 		if (isOpen) {
 			videoPlayRef.current!.srcObject = await window.navigator.mediaDevices.getUserMedia({
 				video: true,
 			});
 			await videoPlayRef.current!.play();
+		} else {
+			(videoPlayRef.current!.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
 		}
 
 		setIsCameraOpen(isOpen);
@@ -64,26 +68,28 @@ export const Demo1 = () => {
 		const video = videoPlayRef.current!;
 
 		if (nextIsRecording) {
-			const recorder = new MediaRecorder(video.srcObject as MediaStream, {
+			recorderRef.current = new MediaRecorder(video.srcObject as MediaStream, {
 				mimeType: 'video/webm;codecs=vp8'
 			});
-			recorder.ondataavailable = (event) => {
+			recorderRef.current.ondataavailable = (event) => {
 				bufRef.current.push(event.data);
 			};
-			recorder.start(10);
+			recorderRef.current.start(10);
+		} else {
+			recorderRef.current?.stop();
 		}
 
 		setIsRecording(nextIsRecording);
 	};
 
-	const onReplayVideo = () => {
+	const onReplayVideo = async () => {
 		const blob = new Blob(bufRef.current, { type: 'video/webm' });
 		const videoReplay = videoReplayRef.current!;
 
 		videoReplay.src = window.URL.createObjectURL(blob);
 		videoReplay.srcObject = null;
 		videoReplay.controls = true;
-		videoReplay.play();
+		await videoReplay.play();
 	};
 
 	const onDownloadVideo = () => {
@@ -98,10 +104,6 @@ export const Demo1 = () => {
 	};
 
 	return <div className="demo1">
-		<video className="video" ref={videoPlayRef}/>
-		<canvas className="canvas" ref={canvasRef}/>
-		<video className="videoReplay" ref={videoReplayRef}/>
-
 		<div className="tools">
 			<button onClick={onToggleCamera}>{isCameraOpen ? '关闭' : '打开'}摄像头</button>
 			<select className="filter" value={filterValue} onChange={onFilterChange}>
@@ -117,6 +119,12 @@ export const Demo1 = () => {
 			<button onClick={onRecord}>{isRecording ? '结束' : '开始'}录制视频</button>
 			<button onClick={onReplayVideo}>回放视频</button>
 			<button onClick={onDownloadVideo}>下载视频</button>
+		</div>
+
+		<div className="shows">
+			<video className="video" ref={videoPlayRef}/>
+			<canvas className="canvas" ref={canvasRef}/>
+			<video className="videoReplay" ref={videoReplayRef}/>
 		</div>
 	</div>;
 };
